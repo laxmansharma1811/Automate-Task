@@ -8,8 +8,11 @@ This repository contains a Python script to automate testing of the signup flow 
 - [Features](#features)
 - [Prerequisites](#prerequisites)
 - [Setup Instructions](#setup-instructions)
+- [Creating Virtual Environment](#creating-virtual-environment)
 - [Running the Script](#running-the-script)
+- [Running with Pytest and Generating Report](#running-with-pytest-and-generating-report)
 - [Test Cases Implemented](#test-cases-implemented)
+- [Test Data / Accounts](#test-data--accounts)
 - [Notes](#notes)
 - [Screenshots](#screenshots)
 - [License](#license)
@@ -45,12 +48,14 @@ This repository contains a Python script to automate testing of the signup flow 
 - **ChromeDriver** corresponding to your Chrome version. Download from [here](https://chromedriver.chromium.org/downloads)
 - Python packages:
   - `selenium`
+  - `pytest`
+  - `pytest-html`
   - `time` (built-in)
-  
-Install Selenium using pip:
+
+Install required packages using pip:
 
 ```bash
-pip install selenium
+pip install selenium pytest pytest-html
 ```
 
 ---
@@ -69,7 +74,46 @@ cd <repository_folder>
 3. Install Python dependencies:
 
 ```bash
-pip install selenium
+pip install -r requirements.txt
+```
+
+---
+
+## Creating Virtual Environment
+
+It is recommended to use a virtual environment to avoid conflicts:
+
+1. Create a virtual environment:
+
+```bash
+python -m venv venv
+```
+
+2. Activate the virtual environment:
+
+- **Windows (Command Prompt):**
+```bash
+venv\Scripts\activate
+```
+- **Windows (PowerShell):**
+```bash
+venv\Scripts\Activate.ps1
+```
+- **Linux/macOS:**
+```bash
+source venv/bin/activate
+```
+
+3. Install dependencies inside the virtual environment:
+
+```bash
+pip install selenium pytest pytest-html
+```
+
+4. To deactivate the environment when done:
+
+```bash
+deactivate
 ```
 
 ---
@@ -89,6 +133,27 @@ python -c "from signup_automation import test_signup_flow; test_signup_flow()"
 ```
 
 **Note:** The script will open a Chrome browser, execute the tests sequentially, and close the browser at the end.
+
+---
+
+## Running with Pytest and Generating Report
+
+1. Create a test file (if not already created, e.g., `test_signup.py`) with the following content:
+
+```python
+from signup_automation import automate_signup
+
+def test_signup_flow():
+    automate_signup()
+```
+
+2. Run tests using pytest and generate an HTML report:
+
+```bash
+pytest test_signup.py --html=report.html --self-contained-html
+```
+
+3. Open the generated `report.html` in a browser to view detailed test results.
 
 ---
 
@@ -132,6 +197,8 @@ testuser_<timestamp>@example.com
   - `sql_injection_failure.png`
   - `unexpected_error.png`
 - Adjust `WebDriverWait` timeout values if page loads slower than expected.
+- Virtual environments are recommended to avoid dependency conflicts.
+- Pytest HTML report provides a detailed summary of each test execution.
 
 ---
 
@@ -146,8 +213,6 @@ sql_injection_failure.png
 unexpected_error.png
 ```
 
+---
 
-
-**Author:** Laxman Sharma  
-
-
+**Author:** Laxman Sharma
