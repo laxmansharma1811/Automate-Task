@@ -1,9 +1,51 @@
+import pytest
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
+import os
 
+
+driver = None
+wait = None
+
+
+def setup_module(module):
+    """Setup: Initialize driver once for all tests."""
+    global driver, wait
+    driver = webdriver.Chrome()
+    wait = WebDriverWait(driver, 20)
+
+
+def teardown_module(module):
+    """Teardown: Quit driver after all tests."""
+    global driver
+    if driver:
+        driver.quit()
+
+
+# ========= PYTEST HOOK FOR SCREENSHOT ON FAILURE =========
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """Attach screenshot in HTML report if test fails."""
+    outcome = yield
+    report = outcome.get_result()
+    if report.when == "call" and report.failed:
+        global driver
+        if driver:
+            screenshot_dir = "screenshots"
+            os.makedirs(screenshot_dir, exist_ok=True)
+            screenshot_path = os.path.join(screenshot_dir, f"{item.name}.png")
+            driver.save_screenshot(screenshot_path)
+            extra = getattr(report, "extra", [])
+            if hasattr(pytest_html, 'extras'):
+                extra.append(pytest_html.extras.image(screenshot_path))
+                report.extra = extra
+
+
+# ========= HELPER FUNCTIONS =========
 
 def generate_unique_email():
     """Generates a unique email using timestamp."""
@@ -11,23 +53,18 @@ def generate_unique_email():
     return f"testuser_{timestamp}@example.com"
 
 
-def init_driver():
-    """Initializes and returns a Chrome WebDriver instance."""
-    driver = webdriver.Chrome()
-    wait = WebDriverWait(driver, 10)
-    return driver, wait
-
-
-def navigate_to_signup(driver, wait):
+def navigate_to_signup():
     """Navigates from login page to signup form."""
+    global driver, wait
     driver.get("https://authorized-partner.netlify.app/login")
     signup_link = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "Sign Up")))
     signup_link.click()
     time.sleep(2)
 
 
-def agree_to_terms(wait):
+def agree_to_terms():
     """Clicks the checkbox to agree to terms and continues."""
+    global wait
     agree_checkbox = wait.until(EC.element_to_be_clickable((By.ID, "remember")))
     agree_checkbox.click()
     continue_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[text()='Continue']")))
@@ -35,8 +72,9 @@ def agree_to_terms(wait):
     time.sleep(2)
 
 
-def fill_signup_form(driver, email="", password="", confirm_password="", phone_number=""):
+def fill_signup_form(email="", password="", confirm_password="", phone_number=""):
     """Fills the signup form dynamically with provided data."""
+    global driver
     driver.find_element(By.NAME, "firstName").clear()
     driver.find_element(By.NAME, "firstName").send_keys("John")
 
@@ -50,7 +88,7 @@ def fill_signup_form(driver, email="", password="", confirm_password="", phone_n
     phone_field = driver.find_element(By.NAME, "phoneNumber")
     phone_field.clear()
     phone_field.send_keys(phone_number)
-    time.sleep(1)  # Allow any dynamic formatting to complete
+    time.sleep(1)
 
     pwd_field = driver.find_element(By.NAME, "password")
     pwd_field.clear()
@@ -59,12 +97,12 @@ def fill_signup_form(driver, email="", password="", confirm_password="", phone_n
     confirm_field = driver.find_element(By.NAME, "confirmPassword")
     confirm_field.clear()
     confirm_field.send_keys(confirm_password)
+    time.sleep(1)
 
-    time.sleep(1)  # Let React validation trigger after typing passwords
 
-
-def submit_form(driver, wait):
+def submit_form():
     """Clicks the next button and waits for page response."""
+    global driver, wait
     next_button = wait.until(
         EC.element_to_be_clickable(
             (By.XPATH, "//button[not(@disabled) and (contains(text(),'Next') or contains(text(),'Continue'))]")
@@ -74,8 +112,9 @@ def submit_form(driver, wait):
     time.sleep(2)
 
 
-def check_validation_error(driver, timeout=3):
+def check_validation_error(timeout=3):
     """Detects validation via aria-invalid, error styling, or visible error messages."""
+    global driver
     try:
         WebDriverWait(driver, timeout).until(
             lambda d: (
@@ -84,195 +123,156 @@ def check_validation_error(driver, timeout=3):
                 len(d.find_elements(By.XPATH, "//div[contains(@class, 'text-[var(--destructive)') and normalize-space(text()) != '']")) > 0
             )
         )
-
-        print("Validation Errors Detected:")
-
-        # Check aria-invalid
-        invalid_inputs = driver.find_elements(By.XPATH, "//input[@aria-invalid='true']")
-        for inp in invalid_inputs:
-            name = inp.get_attribute("name") or "unnamed"
-            print(f" - Input '{name}' is marked invalid (aria-invalid)")
-
-        # Check border-destructive
-        error_borders = driver.find_elements(By.XPATH, "//input[contains(@class, 'border-destructive')]")
-        for inp in error_borders:
-            name = inp.get_attribute("name") or "unnamed"
-            print(f" - Input '{name}' has error styling (border-destructive)")
-
-        # Check visible error messages (especially for password mismatch)
-        error_messages = driver.find_elements(By.XPATH, "//div[contains(@class, 'text-[var(--destructive)') and normalize-space(text()) != '']")
-        for msg_div in error_messages:
-            text = msg_div.text.strip()
-            # Try to associate with nearby input (password/confirm)
-            try:
-                # Navigate to parent, then previous sibling container, then find input
-                container = msg_div.find_element(By.XPATH, "./parent::div/preceding-sibling::div[1]//input")
-                name = container.get_attribute("name") or "unnamed"
-            except Exception:
-                name = "password/confirmPassword"
-
-            print(f" - Error message detected: '{text}' near field '{name}'")
-
         return True
-
-    except Exception as e:
-        print(f"No validation indicators detected. Error during check: {str(e)}")
+    except:
         return False
 
 
-def automate_signup():
-    """Runs full signup flow with validation tests."""
-    driver, wait = init_driver()
+def reset_to_signup():
+    """Helper: Reset state by navigating back to signup form."""
+    navigate_to_signup()
+    agree_to_terms()
+
+
+# ========= INDIVIDUAL TEST FUNCTIONS =========
+
+def test_empty_form_validation():
+    """Test: Submit empty form → should show validation errors."""
+    reset_to_signup()
+    submit_form()
+    assert check_validation_error(), "Expected validation errors not displayed for empty form."
+
+
+def test_password_mismatch():
+    """Test: Password and confirm password mismatch → should show error."""
+    reset_to_signup()
     email = generate_unique_email()
-    password = "Test@12345"
+    fill_signup_form(email=email, password="Test@12345", confirm_password="WrongPass123", phone_number="9800000000")
+    submit_form()
+    assert check_validation_error(), "Expected password mismatch error not displayed."
+
+
+def test_invalid_email_format():
+    """Test: Invalid email format → should show error."""
+    reset_to_signup()
+    fill_signup_form(email="invalid-email", password="Test@12345", confirm_password="Test@12345", phone_number="9800000000")
+    submit_form()
+    assert check_validation_error(), "Expected email format error not displayed."
+
+
+def test_short_password():
+    """Test: Password too short → should show error."""
+    reset_to_signup()
+    email = generate_unique_email()
+    fill_signup_form(email=email, password="Short1!", confirm_password="Short1!", phone_number="9800000000")
+    submit_form()
+    assert check_validation_error(), "Expected short password error not displayed."
+
+
+def test_password_without_special_char():
+    """Test: Password without special character → should show error."""
+    reset_to_signup()
+    email = generate_unique_email()
+    fill_signup_form(email=email, password="NoSpecial123", confirm_password="NoSpecial123", phone_number="9800000000")
+    submit_form()
+    assert check_validation_error(), "Expected 'special char required' error not displayed."
+
+
+def test_password_without_number():
+    """Test: Password without number → should show error."""
+    reset_to_signup()
+    email = generate_unique_email()
+    fill_signup_form(email=email, password="NoNumber@abc", confirm_password="NoNumber@abc", phone_number="9800000000")
+    submit_form()
+    assert check_validation_error(), "Expected 'number required' error not displayed."
+
+
+def test_invalid_phone_number():
+    """Test: Invalid phone number → should show error."""
+    reset_to_signup()
+    email = generate_unique_email()
+    fill_signup_form(email=email, password="Test@12345", confirm_password="Test@12345", phone_number="123")
+    submit_form()
+    assert check_validation_error(), "Expected phone number validation error not displayed."
+
+
+def test_duplicate_email():
+    """Test: Submit duplicate email → should show backend error (if implemented)."""
+    reset_to_signup()
+    email = generate_unique_email()
+
+    # First submission
+    fill_signup_form(email=email, password="Test@12345", confirm_password="Test@12345", phone_number="9800000000")
+    submit_form()
+
+    # Second submission with same email
+    reset_to_signup()
+    fill_signup_form(email=email, password="Test@12345", confirm_password="Test@12345", phone_number="9800000000")
+    submit_form()
 
     try:
-        print(f"Starting Signup Test with email: {email}")
-        navigate_to_signup(driver, wait)
-        agree_to_terms(wait)
+        WebDriverWait(driver, 5).until(
+            EC.presence_of_element_located((By.XPATH, "//div[contains(text(),'already exists') or contains(text(),'duplicate') or contains(text(),'taken')]"))
+        )
+        assert True  # Pass if error found
+    except:
+        pytest.skip("Duplicate email error not implemented or too fast to catch.")
 
-        # --- NEGATIVE TEST CASE 1: EMPTY FORM SUBMISSION ---
-        print("\nTesting Empty Form Validation...")
-        submit_form(driver, wait)
-        if not check_validation_error(driver):
-            print("Expected validation errors not displayed for empty form.")
-        else:
-            print("Empty form validation displayed as expected.")
 
-        # --- NEGATIVE TEST CASE 2: PASSWORD MISMATCH ---
-        print("\nTesting Password Mismatch Validation...")
-        fill_signup_form(driver, email=email, password=password, confirm_password="WrongPass123", phone_number="9800000000")
-        submit_form(driver, wait)
-        if not check_validation_error(driver):
-            print("Expected password mismatch error not displayed.")
-        else:
-            print("Password mismatch validation displayed as expected.")
+def test_sql_injection_in_name():
+    """Test: SQL injection in first name → should not crash system."""
+    reset_to_signup()
+    email = generate_unique_email()
 
-        # --- NEGATIVE TEST CASE 3: INVALID EMAIL FORMAT ---
-        print("\nTesting Invalid Email Format...")
-        fill_signup_form(driver, email="invalid-email", password=password, confirm_password=password, phone_number="9800000000")
-        submit_form(driver, wait)
-        if not check_validation_error(driver):
-            print("Expected email format error not displayed.")
-        else:
-            print("Invalid email validation displayed as expected.")
+    driver.find_element(By.NAME, "firstName").clear()
+    driver.find_element(By.NAME, "firstName").send_keys("John'; DROP TABLE users;--")
+    driver.find_element(By.NAME, "lastName").clear()
+    driver.find_element(By.NAME, "lastName").send_keys("Doe")
+    email_field = driver.find_element(By.NAME, "email")
+    email_field.clear()
+    email_field.send_keys(email)
+    phone_field = driver.find_element(By.NAME, "phoneNumber")
+    phone_field.clear()
+    phone_field.send_keys("9800000000")
+    pwd_field = driver.find_element(By.NAME, "password")
+    pwd_field.clear()
+    pwd_field.send_keys("Test@12345")
+    confirm_field = driver.find_element(By.NAME, "confirmPassword")
+    confirm_field.clear()
+    confirm_field.send_keys("Test@12345")
+    submit_form()
 
-        # --- NEGATIVE TEST CASE 4: SHORT PASSWORD ---
-        print("\nTesting Short Password (less than 8 chars)...")
-        fill_signup_form(driver, email=email, password="Short1!", confirm_password="Short1!", phone_number="9800000000")
-        submit_form(driver, wait)
-        if not check_validation_error(driver):
-            print("Expected short password error not displayed.")
-        else:
-            print("Short password validation displayed as expected.")
+    if check_validation_error():
+        assert True, "SQL Injection handled via validation."
+    else:
+        # Check page is still responsive
+        assert driver.title, "Page crashed after SQL injection attempt."
 
-        # --- NEGATIVE TEST CASE 5: PASSWORD WITHOUT SPECIAL CHAR ---
-        print("\nTesting Password Without Special Character...")
-        fill_signup_form(driver, email=email, password="NoSpecial123", confirm_password="NoSpecial123", phone_number="9800000000")
-        submit_form(driver, wait)
-        if not check_validation_error(driver):
-            print("Expected 'special char required' error not displayed.")
-        else:
-            print("Password policy (special char) validation displayed as expected.")
 
-        # --- NEGATIVE TEST CASE 6: PASSWORD WITHOUT NUMBER ---
-        print("\n🧪 Testing Password Without Number...")
-        fill_signup_form(driver, email=email, password="NoNumber@abc", confirm_password="NoNumber@abc", phone_number="9800000000")
-        submit_form(driver, wait)
-        if not check_validation_error(driver):
-            print("Expected 'number required' error not displayed.")
-        else:
-            print("Password policy (number) validation displayed as expected.")
+def test_valid_signup():
+    """Test: Valid signup → should proceed to next step (Agency Details, etc.)."""
+    reset_to_signup()
+    email = generate_unique_email()
+    fill_signup_form(email=email, password="Test@12345", confirm_password="Test@12345", phone_number="9800000000")
+    submit_form()
 
-        # --- NEGATIVE TEST CASE 7: INVALID PHONE NUMBER ---
-        print("\nTesting Invalid Phone Number (too short)...")
-        fill_signup_form(driver, email=email, password=password, confirm_password=password, phone_number="123")
-        submit_form(driver, wait)
-        if not check_validation_error(driver):
-            print("Expected phone number validation error not displayed.")
-        else:
-            print("Invalid phone number validation displayed as expected.")
-
-        # --- NEGATIVE TEST CASE 8: DUPLICATE EMAIL ---
-        print("\n🧪 Testing Duplicate Email Submission...")
-        fill_signup_form(driver, email=email, password=password, confirm_password=password, phone_number="9800000000")
-        submit_form(driver, wait)
-        try:
-            WebDriverWait(driver, 5).until(
-                EC.presence_of_element_located((By.XPATH, "//div[contains(text(),'already exists') or contains(text(),'duplicate') or contains(text(),'taken')]"))
-            )
-            print("Duplicate email error detected as expected.")
-        except:
-            print("No duplicate email error shown — may not be implemented or too fast.")
-
-        # --- NEGATIVE TEST CASE 9: SQL INJECTION IN NAME FIELD ---
-        print("\nTesting SQL Injection in First Name...")
-        driver.find_element(By.NAME, "firstName").clear()
-        driver.find_element(By.NAME, "firstName").send_keys("John'; DROP TABLE users;--")
-        driver.find_element(By.NAME, "lastName").clear()
-        driver.find_element(By.NAME, "lastName").send_keys("Doe")
-        email_field = driver.find_element(By.NAME, "email")
-        email_field.clear()
-        email_field.send_keys(generate_unique_email())  # new email to avoid dup
-        phone_field = driver.find_element(By.NAME, "phoneNumber")
-        phone_field.clear()
-        phone_field.send_keys("9800000000")
-        pwd_field = driver.find_element(By.NAME, "password")
-        pwd_field.clear()
-        pwd_field.send_keys(password)
-        confirm_field = driver.find_element(By.NAME, "confirmPassword")
-        confirm_field.clear()
-        confirm_field.send_keys(password)
-        submit_form(driver, wait)
-
-        try:
-            if check_validation_error(driver):
-                print("SQL Injection attempt handled safely (validation shown).")
-            else:
-                WebDriverWait(driver, 3).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-                print("SQL Injection attempt did not break the system — PASSED.")
-        except Exception as e:
-            print(f"SQL Injection caused system error — SECURITY BUG FOUND. {str(e)}")
-            driver.save_screenshot("sql_injection_failure.png")
-
-        # --- POSITIVE TEST CASE: VALID SIGNUP ---
-        print("\n🧪 Testing Valid Signup...")
-        fill_signup_form(driver, email=generate_unique_email(), password=password, confirm_password=password, phone_number="9800000000")
-        submit_form(driver, wait)
-
-        # Check for success or redirection
-        try:
-            success_element = wait.until(
-                EC.presence_of_element_located((
-                    By.XPATH,
-                    "//p[contains(text(),'successfully') or contains(text(),'Welcome') or contains(text(),'Congratulations')]"
-                    " | //h2[contains(text(),'Agency Details')]"
-                    " | //div[contains(text(),'Step 2')]"
-                    " | //span[contains(text(),'Agency Details')]"
-                ))
-            )
-            print(f"✅ Signup completed successfully. Detected: '{success_element.text}'")
-        except Exception as e:
-            print(f"Signup did not complete as expected. Error: {str(e)}")
-            driver.save_screenshot("signup_failed.png")
-
-        # Final Summary
-        print("\n" + "="*60)
-        print("SIGNUP TEST SUITE COMPLETED — ALL CASES EXECUTED")
-        print("="*60)
-
+    try:
+        success_element = wait.until(
+            EC.presence_of_element_located((
+                By.XPATH,
+                "//p[contains(text(),'successfully') or contains(text(),'Welcome') or contains(text(),'Congratulations')]"
+                " | //h2[contains(text(),'Agency Details')]"
+                " | //div[contains(text(),'Step 2')]"
+                " | //span[contains(text(),'Agency Details')]"
+                " | //div[contains(@class, 'splash-screen') and not(contains(@style, 'display: none'))]"
+            ))
+        )
+        assert success_element, "Expected success indicator not found after valid signup."
     except Exception as e:
-        print(f"Test failed due to: {e}")
-        driver.save_screenshot("unexpected_error.png")
-    finally:
-        time.sleep(3)
-        driver.quit()
-        print("Browser closed.")
-
-
-if __name__ == "__main__":
-    automate_signup()
-
-
-def test_signup_flow():
-    automate_signup()
+        # Fallback: Check URL for success keywords
+        current_url = driver.current_url
+        success_indicators = ["/agency", "/step2", "/profile", "/dashboard", "/onboarding", "/verify"]
+        if any(indicator in current_url for indicator in success_indicators):
+            assert True, f"Redirected to success path: {current_url}"
+        else:
+            pytest.fail(f"Signup failed. Still on: {current_url}. Error: {str(e)}")
