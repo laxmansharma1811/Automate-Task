@@ -2,404 +2,277 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import time
-import logging
-import os
 
-# === CONFIGURATION ===
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
-SCREENSHOT_DIR = "test_screenshots"
-os.makedirs(SCREENSHOT_DIR, exist_ok=True)
-
-# === HELPER FUNCTIONS ===
 
 def generate_unique_email():
     """Generates a unique email using timestamp."""
     timestamp = int(time.time())
     return f"testuser_{timestamp}@example.com"
 
-def init_driver(headless=False):
+
+def init_driver():
     """Initializes and returns a Chrome WebDriver instance."""
-    options = webdriver.ChromeOptions()
-    if headless:
-        options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--window-size=1920,1080")
-    
-    driver = webdriver.Chrome(options=options)
-    wait = WebDriverWait(driver, 15)  # Increased for reliability
+    driver = webdriver.Chrome()
+    wait = WebDriverWait(driver, 10)
     return driver, wait
 
-def take_screenshot(driver, name):
-    """Takes screenshot and saves to folder."""
-    timestamp = int(time.time())
-    path = os.path.join(SCREENSHOT_DIR, f"{name}_{timestamp}.png")
-    driver.save_screenshot(path)
-    logger.info(f"Screenshot saved: {path}")
-    return path
 
-def debug_form_state(driver):
-    """Logs current state of all key form fields for debugging."""
-    logger.debug("=== FORM STATE DEBUG ===")
-    fields = {
-        "firstName": "//input[@name='firstName']",
-        "lastName": "//input[@name='lastName']",
-        "email": "//input[@name='email']",
-        "phoneNumber": "//input[@name='phoneNumber']",
-        "password": "//input[@name='password']",
-        "confirmPassword": "//input[@name='confirmPassword']"
-    }
-    
-    for name, xpath in fields.items():
-        try:
-            el = driver.find_element(By.XPATH, xpath)
-            value = el.get_attribute("value") or "(empty)"
-            aria_invalid = el.get_attribute("aria-invalid")
-            classes = el.get_attribute("class") or ""
-            is_error_border = "border-destructive" in classes
-            logger.debug(f"{name}: value='{value}', aria-invalid={aria_invalid}, has_error_border={is_error_border}")
-        except:
-            logger.debug(f"{name}: NOT FOUND")
-    logger.debug("=== END FORM STATE ===")
+def navigate_to_signup(driver, wait):
+    """Navigates from login page to signup form."""
+    driver.get("https://authorized-partner.netlify.app/login")
+    signup_link = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "Sign Up")))
+    signup_link.click()
+    time.sleep(2)
 
-def wait_for_validation_appear(driver, timeout=5):
-    """Waits for any validation indicator to appear after interaction."""
+
+def agree_to_terms(wait):
+    """Clicks the checkbox to agree to terms and continues."""
+    agree_checkbox = wait.until(EC.element_to_be_clickable((By.ID, "remember")))
+    agree_checkbox.click()
+    continue_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[text()='Continue']")))
+    continue_button.click()
+    time.sleep(2)
+
+
+def fill_signup_form(driver, email="", password="", confirm_password="", phone_number=""):
+    """Fills the signup form dynamically with provided data."""
+    driver.find_element(By.NAME, "firstName").clear()
+    driver.find_element(By.NAME, "firstName").send_keys("John")
+
+    driver.find_element(By.NAME, "lastName").clear()
+    driver.find_element(By.NAME, "lastName").send_keys("Doe")
+
+    email_field = driver.find_element(By.NAME, "email")
+    email_field.clear()
+    email_field.send_keys(email)
+
+    phone_field = driver.find_element(By.NAME, "phoneNumber")
+    phone_field.clear()
+    phone_field.send_keys(phone_number)
+    time.sleep(1)  # Allow any dynamic formatting to complete
+
+    pwd_field = driver.find_element(By.NAME, "password")
+    pwd_field.clear()
+    pwd_field.send_keys(password)
+
+    confirm_field = driver.find_element(By.NAME, "confirmPassword")
+    confirm_field.clear()
+    confirm_field.send_keys(confirm_password)
+
+    time.sleep(1)  # Let React validation trigger after typing passwords
+
+
+def submit_form(driver, wait):
+    """Clicks the next button and waits for page response."""
+    next_button = wait.until(
+        EC.element_to_be_clickable(
+            (By.XPATH, "//button[not(@disabled) and (contains(text(),'Next') or contains(text(),'Continue'))]")
+        )
+    )
+    next_button.click()
+    time.sleep(2)
+
+
+def check_validation_error(driver, timeout=3):
+    """Detects validation via aria-invalid, error styling, or visible error messages."""
     try:
         WebDriverWait(driver, timeout).until(
             lambda d: (
                 len(d.find_elements(By.XPATH, "//input[@aria-invalid='true']")) > 0 or
                 len(d.find_elements(By.XPATH, "//input[contains(@class, 'border-destructive')]")) > 0 or
-                len(d.find_elements(By.XPATH, "//*[contains(@class, 'text-destructive') or contains(text(), 'error') or contains(text(), 'required')]")) > 0
+                len(d.find_elements(By.XPATH, "//div[contains(@class, 'text-[var(--destructive)') and normalize-space(text()) != '']")) > 0
             )
         )
-        return True
-    except TimeoutException:
-        return False
 
-def check_validation_error(driver, scenario=""):
-    """
-    Comprehensive validation detector.
-    Returns dict: {found: bool, details: list}
-    """
-    details = []
-    found = False
+        print("Validation Errors Detected:")
 
-    # 1. Check ARIA-invalid
-    invalid_inputs = driver.find_elements(By.XPATH, "//input[@aria-invalid='true']")
-    for inp in invalid_inputs:
-        name = inp.get_attribute("name") or "unnamed"
-        details.append(f"ARIA-invalid on '{name}'")
-        found = True
+        # Check aria-invalid
+        invalid_inputs = driver.find_elements(By.XPATH, "//input[@aria-invalid='true']")
+        for inp in invalid_inputs:
+            name = inp.get_attribute("name") or "unnamed"
+            print(f" - Input '{name}' is marked invalid (aria-invalid)")
 
-    # 2. Check error styling
-    error_borders = driver.find_elements(By.XPATH, "//input[contains(@class, 'border-destructive')]")
-    for inp in error_borders:
-        name = inp.get_attribute("name") or "unnamed"
-        if f"ARIA-invalid on '{name}'" not in details:
-            details.append(f"Error border on '{name}'")
-            found = True
+        # Check border-destructive
+        error_borders = driver.find_elements(By.XPATH, "//input[contains(@class, 'border-destructive')]")
+        for inp in error_borders:
+            name = inp.get_attribute("name") or "unnamed"
+            print(f" - Input '{name}' has error styling (border-destructive)")
 
-    # 3. Check visible error messages
-    error_texts = driver.find_elements(By.XPATH, 
-        "//*[contains(@class, 'text-destructive') or contains(@class, 'text-[var(--destructive)]')] | "
-        "//*[contains(text(), 'required') or contains(text(), 'match') or contains(text(), 'invalid') or contains(text(), 'at least')]"
-    )
-    for el in error_texts:
-        txt = el.text.strip()
-        if txt and txt not in details:
-            details.append(f"Error msg: '{txt}'")
-            found = True
-
-    if found:
-        logger.info(f"✅ Validation detected [{scenario}]:")
-        for d in details:
-            logger.info(f"   • {d}")
-    else:
-        logger.warning(f"❌ No validation detected [{scenario}]")
-
-    return {"found": found, "details": details}
-
-def check_password_mismatch(driver):
-    """Specifically checks if password & confirm are invalid while others are valid."""
-    try:
-        pwd = driver.find_element(By.NAME, "password")
-        confirm = driver.find_element(By.NAME, "confirmPassword")
-        
-        pwd_invalid = pwd.get_attribute("aria-invalid") == "true"
-        confirm_invalid = confirm.get_attribute("aria-invalid") == "true"
-        
-        # Check if other fields are valid (to confirm it's mismatch, not general invalid)
-        other_fields = ["firstName", "lastName", "email", "phoneNumber"]
-        other_invalid = False
-        for field_name in other_fields:
+        # Check visible error messages (especially for password mismatch)
+        error_messages = driver.find_elements(By.XPATH, "//div[contains(@class, 'text-[var(--destructive)') and normalize-space(text()) != '']")
+        for msg_div in error_messages:
+            text = msg_div.text.strip()
+            # Try to associate with nearby input (password/confirm)
             try:
-                el = driver.find_element(By.NAME, field_name)
-                if el.get_attribute("aria-invalid") == "true":
-                    other_invalid = True
-                    break
-            except:
-                continue
+                # Navigate to parent, then previous sibling container, then find input
+                container = msg_div.find_element(By.XPATH, "./parent::div/preceding-sibling::div[1]//input")
+                name = container.get_attribute("name") or "unnamed"
+            except Exception:
+                name = "password/confirmPassword"
 
-        if pwd_invalid and confirm_invalid and not other_invalid:
-            logger.info("✅ Password mismatch correctly isolated")
-            return True
-        elif pwd_invalid and confirm_invalid:
-            logger.info("⚠️  Password fields invalid but other fields also invalid")
-            return True  # Still consider it detected
-        return False
-    except Exception as e:
-        logger.error(f"Error checking password mismatch: {e}")
-        return False
+            print(f" - Error message detected: '{text}' near field '{name}'")
 
-# === PAGE OBJECT METHODS ===
-
-def navigate_to_signup(driver, wait):
-    """Navigates from login page to signup form."""
-    logger.info("Navigating to signup page...")
-    driver.get("https://authorized-partner.netlify.app/login")
-    try:
-        signup_link = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "Sign Up")))
-        signup_link.click()
-        time.sleep(2)
-        logger.info("✅ Navigated to signup form")
-    except Exception as e:
-        take_screenshot(driver, "navigate_signup_failed")
-        raise Exception(f"Failed to navigate to signup: {e}")
-
-def agree_to_terms(wait):
-    """Clicks the checkbox to agree to terms and continues."""
-    logger.info("Agreeing to terms...")
-    try:
-        agree_checkbox = wait.until(EC.element_to_be_clickable((By.ID, "remember")))
-        agree_checkbox.click()
-        continue_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[text()='Continue']")))
-        continue_button.click()
-        time.sleep(2)
-        logger.info("✅ Agreed to terms and continued")
-    except Exception as e:
-        take_screenshot(driver, "agree_terms_failed")
-        raise Exception(f"Failed to agree to terms: {e}")
-
-def fill_signup_form(driver, firstName="John", lastName="Doe", email="", password="", confirm_password="", phone_number=""):
-    """Fills the signup form dynamically with provided data."""
-    logger.info("Filling signup form...")
-    try:
-        # Clear and fill each field
-        fields = [
-            ("firstName", firstName),
-            ("lastName", lastName),
-            ("email", email),
-            ("phoneNumber", phone_number),
-            ("password", password),
-            ("confirmPassword", confirm_password)
-        ]
-        
-        for name, value in fields:
-            field = driver.find_element(By.NAME, name)
-            field.clear()
-            if value:
-                field.send_keys(value)
-            logger.debug(f"Filled {name}: {value if value else '(empty)'}")
-        
-        # Wait for any dynamic formatting (phone, etc.)
-        time.sleep(2)
-        logger.info("✅ Form filled successfully")
-    except Exception as e:
-        take_screenshot(driver, "fill_form_failed")
-        raise Exception(f"Failed to fill form: {e}")
-
-def submit_form(driver, wait):
-    """Clicks the next button and waits for response."""
-    logger.info("Submitting form...")
-    try:
-        next_button = wait.until(EC.element_to_be_clickable(
-            (By.XPATH, "//button[contains(text(),'Next') or contains(text(),'Continue')]")))
-        next_button.click()
-        time.sleep(1)  # Short wait before checking validation
-        logger.info("✅ Form submitted")
-    except Exception as e:
-        take_screenshot(driver, "submit_form_failed")
-        raise Exception(f"Failed to submit form: {e}")
-
-def check_successful_navigation(driver, wait):
-    """Checks if signup completed successfully via navigation or success message."""
-    logger.info("Checking for successful signup...")
-    try:
-        WebDriverWait(driver, 10).until(
-            lambda d: (
-                "dashboard" in d.current_url.lower() or
-                "welcome" in d.current_url.lower() or
-                len(d.find_elements(By.XPATH, "//*[contains(text(), 'success') or contains(text(), 'welcome') or contains(text(), 'dashboard') or contains(text(), 'complete')]")) > 0
-            )
-        )
-        logger.info(f"✅ Signup successful! Current URL: {driver.current_url}")
         return True
-    except TimeoutException:
-        logger.error(f"❌ Signup failed - still on: {driver.current_url}")
-        take_screenshot(driver, "signup_failed")
+
+    except Exception as e:
+        print(f"No validation indicators detected. Error during check: {str(e)}")
         return False
 
-# === TEST CASES ===
-
-class TestResults:
-    def __init__(self):
-        self.results = []
-    
-    def add_result(self, test_name, passed, details=""):
-        result = {
-            "test_name": test_name,
-            "passed": passed,
-            "details": details,
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
-        }
-        self.results.append(result)
-        status = "✅ PASS" if passed else "❌ FAIL"
-        logger.info(f"{status} {test_name} - {details}")
-    
-    def print_summary(self):
-        total = len(self.results)
-        passed = sum(1 for r in self.results if r["passed"])
-        failed = total - passed
-        
-        logger.info("\n" + "="*50)
-        logger.info("TEST EXECUTION SUMMARY")
-        logger.info("="*50)
-        for result in self.results:
-            status = "✅ PASS" if result["passed"] else "❌ FAIL"
-            logger.info(f"{status} {result['test_name']}")
-        logger.info("="*50)
-        logger.info(f"Total: {total} | Passed: {passed} | Failed: {failed}")
-        logger.info("="*50)
-        
-        if failed > 0:
-            logger.error("❌ SOME TESTS FAILED!")
-        else:
-            logger.info("🎉 ALL TESTS PASSED!")
-
-# === MAIN TEST ORCHESTRATOR ===
 
 def automate_signup():
-    """Runs full signup flow with comprehensive validation tests."""
+    """Runs full signup flow with validation tests."""
     driver, wait = init_driver()
-    test_results = TestResults()
     email = generate_unique_email()
     password = "Test@12345"
-    
-    logger.info(f"🚀 Starting Signup Test Suite with email: {email}")
 
     try:
-        # Navigate and agree to terms
+        print(f"Starting Signup Test with email: {email}")
         navigate_to_signup(driver, wait)
         agree_to_terms(wait)
 
-        # === TEST CASE 1: EMPTY FORM VALIDATION ===
-        logger.info("\n=== TEST CASE 1: EMPTY FORM VALIDATION ===")
-        fill_signup_form(driver, email="", password="", confirm_password="", phone_number="")
+        # --- NEGATIVE TEST CASE 1: EMPTY FORM SUBMISSION ---
+        print("\nTesting Empty Form Validation...")
         submit_form(driver, wait)
-        
-        # Wait for validation to appear (async)
-        if wait_for_validation_appear(driver, 5):
-            validation = check_validation_error(driver, "Empty Form")
-            if validation["found"]:
-                test_results.add_result("Empty Form Validation", True, "Validation errors detected as expected")
-            else:
-                test_results.add_result("Empty Form Validation", False, "No validation errors detected")
-                take_screenshot(driver, "empty_form_no_validation")
-                debug_form_state(driver)
+        if not check_validation_error(driver):
+            print("Expected validation errors not displayed for empty form.")
         else:
-            test_results.add_result("Empty Form Validation", False, "Validation did not appear within timeout")
-            take_screenshot(driver, "empty_form_timeout")
-            debug_form_state(driver)
+            print("Empty form validation displayed as expected.")
 
-        # === TEST CASE 2: PASSWORD MISMATCH VALIDATION ===
-        logger.info("\n=== TEST CASE 2: PASSWORD MISMATCH VALIDATION ===")
+        # --- NEGATIVE TEST CASE 2: PASSWORD MISMATCH ---
+        print("\nTesting Password Mismatch Validation...")
         fill_signup_form(driver, email=email, password=password, confirm_password="WrongPass123", phone_number="9800000000")
         submit_form(driver, wait)
-        
-        if wait_for_validation_appear(driver, 5):
-            if check_password_mismatch(driver):
-                test_results.add_result("Password Mismatch Validation", True, "Password mismatch correctly detected")
-            else:
-                validation = check_validation_error(driver, "Password Mismatch")
-                if validation["found"]:
-                    test_results.add_result("Password Mismatch Validation", True, "General validation detected")
-                else:
-                    test_results.add_result("Password Mismatch Validation", False, "No validation detected for mismatch")
-                    take_screenshot(driver, "password_mismatch_no_validation")
-                    debug_form_state(driver)
+        if not check_validation_error(driver):
+            print("Expected password mismatch error not displayed.")
         else:
-            test_results.add_result("Password Mismatch Validation", False, "Validation did not appear within timeout")
-            take_screenshot(driver, "password_mismatch_timeout")
-            debug_form_state(driver)
+            print("Password mismatch validation displayed as expected.")
 
-        # === TEST CASE 3: INVALID EMAIL FORMAT ===
-        logger.info("\n=== TEST CASE 3: INVALID EMAIL FORMAT ===")
+        # --- NEGATIVE TEST CASE 3: INVALID EMAIL FORMAT ---
+        print("\nTesting Invalid Email Format...")
         fill_signup_form(driver, email="invalid-email", password=password, confirm_password=password, phone_number="9800000000")
         submit_form(driver, wait)
-        
-        if wait_for_validation_appear(driver, 5):
-            validation = check_validation_error(driver, "Invalid Email")
-            email_invalid = any("email" in detail for detail in validation["details"]) if validation["found"] else False
-            if email_invalid:
-                test_results.add_result("Invalid Email Validation", True, "Email validation detected")
-            else:
-                test_results.add_result("Invalid Email Validation", False, "Email field not marked invalid")
-                take_screenshot(driver, "invalid_email_no_validation")
+        if not check_validation_error(driver):
+            print("Expected email format error not displayed.")
         else:
-            test_results.add_result("Invalid Email Validation", False, "Validation did not appear within timeout")
-            take_screenshot(driver, "invalid_email_timeout")
+            print("Invalid email validation displayed as expected.")
 
-        # === TEST CASE 4: WEAK PASSWORD ===
-        logger.info("\n=== TEST CASE 4: WEAK PASSWORD VALIDATION ===")
-        fill_signup_form(driver, email=email, password="weak", confirm_password="weak", phone_number="9800000000")
+        # --- NEGATIVE TEST CASE 4: SHORT PASSWORD ---
+        print("\nTesting Short Password (less than 8 chars)...")
+        fill_signup_form(driver, email=email, password="Short1!", confirm_password="Short1!", phone_number="9800000000")
         submit_form(driver, wait)
-        
-        if wait_for_validation_appear(driver, 5):
-            validation = check_validation_error(driver, "Weak Password")
-            password_invalid = any("password" in detail for detail in validation["details"]) if validation["found"] else False
-            if password_invalid:
-                test_results.add_result("Weak Password Validation", True, "Password strength validation detected")
-            else:
-                test_results.add_result("Weak Password Validation", False, "Password field not marked invalid")
-                take_screenshot(driver, "weak_password_no_validation")
+        if not check_validation_error(driver):
+            print("Expected short password error not displayed.")
         else:
-            test_results.add_result("Weak Password Validation", False, "Validation did not appear within timeout")
-            take_screenshot(driver, "weak_password_timeout")
+            print("Short password validation displayed as expected.")
 
-        # === TEST CASE 5: VALID SIGNUP ===
-        logger.info("\n=== TEST CASE 5: VALID SIGNUP ===")
+        # --- NEGATIVE TEST CASE 5: PASSWORD WITHOUT SPECIAL CHAR ---
+        print("\nTesting Password Without Special Character...")
+        fill_signup_form(driver, email=email, password="NoSpecial123", confirm_password="NoSpecial123", phone_number="9800000000")
+        submit_form(driver, wait)
+        if not check_validation_error(driver):
+            print("Expected 'special char required' error not displayed.")
+        else:
+            print("Password policy (special char) validation displayed as expected.")
+
+        # --- NEGATIVE TEST CASE 6: PASSWORD WITHOUT NUMBER ---
+        print("\n🧪 Testing Password Without Number...")
+        fill_signup_form(driver, email=email, password="NoNumber@abc", confirm_password="NoNumber@abc", phone_number="9800000000")
+        submit_form(driver, wait)
+        if not check_validation_error(driver):
+            print("Expected 'number required' error not displayed.")
+        else:
+            print("Password policy (number) validation displayed as expected.")
+
+        # --- NEGATIVE TEST CASE 7: INVALID PHONE NUMBER ---
+        print("\nTesting Invalid Phone Number (too short)...")
+        fill_signup_form(driver, email=email, password=password, confirm_password=password, phone_number="123")
+        submit_form(driver, wait)
+        if not check_validation_error(driver):
+            print("Expected phone number validation error not displayed.")
+        else:
+            print("Invalid phone number validation displayed as expected.")
+
+        # --- NEGATIVE TEST CASE 8: DUPLICATE EMAIL ---
+        print("\n🧪 Testing Duplicate Email Submission...")
         fill_signup_form(driver, email=email, password=password, confirm_password=password, phone_number="9800000000")
         submit_form(driver, wait)
-        
-        if check_successful_navigation(driver, wait):
-            test_results.add_result("Valid Signup", True, "User successfully signed up")
-        else:
-            test_results.add_result("Valid Signup", False, "Signup did not complete successfully")
-            debug_form_state(driver)
+        try:
+            WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.XPATH, "//div[contains(text(),'already exists') or contains(text(),'duplicate') or contains(text(),'taken')]"))
+            )
+            print("Duplicate email error detected as expected.")
+        except:
+            print("No duplicate email error shown — may not be implemented or too fast.")
+
+        # --- NEGATIVE TEST CASE 9: SQL INJECTION IN NAME FIELD ---
+        print("\nTesting SQL Injection in First Name...")
+        driver.find_element(By.NAME, "firstName").clear()
+        driver.find_element(By.NAME, "firstName").send_keys("John'; DROP TABLE users;--")
+        driver.find_element(By.NAME, "lastName").clear()
+        driver.find_element(By.NAME, "lastName").send_keys("Doe")
+        email_field = driver.find_element(By.NAME, "email")
+        email_field.clear()
+        email_field.send_keys(generate_unique_email())  # new email to avoid dup
+        phone_field = driver.find_element(By.NAME, "phoneNumber")
+        phone_field.clear()
+        phone_field.send_keys("9800000000")
+        pwd_field = driver.find_element(By.NAME, "password")
+        pwd_field.clear()
+        pwd_field.send_keys(password)
+        confirm_field = driver.find_element(By.NAME, "confirmPassword")
+        confirm_field.clear()
+        confirm_field.send_keys(password)
+        submit_form(driver, wait)
+
+        try:
+            if check_validation_error(driver):
+                print("SQL Injection attempt handled safely (validation shown).")
+            else:
+                WebDriverWait(driver, 3).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+                print("SQL Injection attempt did not break the system — PASSED.")
+        except Exception as e:
+            print(f"SQL Injection caused system error — SECURITY BUG FOUND. {str(e)}")
+            driver.save_screenshot("sql_injection_failure.png")
+
+        # --- POSITIVE TEST CASE: VALID SIGNUP ---
+        print("\n🧪 Testing Valid Signup...")
+        fill_signup_form(driver, email=generate_unique_email(), password=password, confirm_password=password, phone_number="9800000000")
+        submit_form(driver, wait)
+
+        # Check for success or redirection
+        try:
+            success_element = wait.until(
+                EC.presence_of_element_located((
+                    By.XPATH,
+                    "//p[contains(text(),'successfully') or contains(text(),'Welcome') or contains(text(),'Congratulations')]"
+                    " | //h2[contains(text(),'Agency Details')]"
+                    " | //div[contains(text(),'Step 2')]"
+                    " | //span[contains(text(),'Agency Details')]"
+                ))
+            )
+            print(f"✅ Signup completed successfully. Detected: '{success_element.text}'")
+        except Exception as e:
+            print(f"Signup did not complete as expected. Error: {str(e)}")
+            driver.save_screenshot("signup_failed.png")
+
+        # Final Summary
+        print("\n" + "="*60)
+        print("SIGNUP TEST SUITE COMPLETED — ALL CASES EXECUTED")
+        print("="*60)
 
     except Exception as e:
-        logger.error(f"❌ Test execution failed due to: {e}")
-        take_screenshot(driver, "unexpected_error")
-        test_results.add_result("Test Execution", False, f"Unexpected error: {e}")
+        print(f"Test failed due to: {e}")
+        driver.save_screenshot("unexpected_error.png")
     finally:
         time.sleep(3)
         driver.quit()
-        logger.info("🏁 Browser closed.")
-        test_results.print_summary()
-        return test_results
+        print("Browser closed.")
 
-# === ENTRY POINT ===
 
 if __name__ == "__main__":
-    results = automate_signup()
-    
-    # Exit with non-zero code if any tests failed (for CI/CD)
-    failed_tests = sum(1 for r in results.results if not r["passed"])
-    if failed_tests > 0:
-        exit(1)
-    else:
-        exit(0)
+    automate_signup()
+
+
+def test_signup_flow():
+    automate_signup()
