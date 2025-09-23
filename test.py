@@ -68,15 +68,29 @@ def submit_form(driver, wait):
     time.sleep(2)
 
 
-def check_validation_error(driver):
-    """Checks if validation error messages are displayed on the page."""
-    errors = driver.find_elements(By.XPATH, "//p[contains(@class, 'text-red') or contains(text(),'required')]")
-    if errors:
-        print("Validation Errors Found:")
-        for e in errors:
-            print(f" - {e.text}")
+def check_validation_error(driver, timeout=3):
+    """Detects validation via aria-invalid or error styling."""
+    try:
+        WebDriverWait(driver, timeout).until(
+            lambda d: (
+                len(d.find_elements(By.XPATH, "//input[@aria-invalid='true']")) > 0 or
+                len(d.find_elements(By.XPATH, "//input[contains(@class, 'border-destructive')]")) > 0
+            )
+        )
+        invalid_inputs = driver.find_elements(By.XPATH, "//input[@aria-invalid='true']")
+        error_borders = driver.find_elements(By.XPATH, "//input[contains(@class, 'border-destructive')]")
+
+        print("Validation Errors Detected:")
+        for inp in invalid_inputs:
+            name = inp.get_attribute("name") or "unnamed"
+            print(f" - Input '{name}' is marked invalid (aria-invalid)")
+        for inp in error_borders:
+            name = inp.get_attribute("name") or "unnamed"
+            print(f" - Input '{name}' has error styling (border-destructive)")
         return True
-    return False
+    except:
+        print("No validation indicators detected.")
+        return False
 
 
 def automate_signup():
@@ -103,7 +117,7 @@ def automate_signup():
         fill_signup_form(driver, email=email, password=password, confirm_password="WrongPass123", phone_number="9800000000")
         submit_form(driver, wait)
         if not check_validation_error(driver):
-            print("xpected password mismatch error not displayed.")
+            print("Expected password mismatch error not displayed.")
         else:
             print("Password mismatch validation displayed as expected.")
 
@@ -131,3 +145,9 @@ def automate_signup():
 
 if __name__ == "__main__":
     automate_signup()
+
+
+
+def test_signup_flow():
+    automate_signup()
+
