@@ -186,7 +186,6 @@ testuser_<timestamp>@example.com
 - Passwords used for testing: `Test@12345`  
 - Phone numbers for testing: `9800000000`  
 
-
 ---
 
 **Author:** Laxman Sharma
