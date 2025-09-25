@@ -139,13 +139,43 @@ python signup_automation_script.py
 
 ---
 
-## Test Logging
+## Running the Signup Automation
 
-* All automation steps are logged with timestamps.
-* Log levels:
+Run the signup automation script:
 
-  * `INFO` for normal steps
-  * `SUCCESS` for passed steps
-  * `ERROR` for failures
-* Screenshots are taken automatically on errors.
+```bash
+python signup_automation_script.py
+The script will prompt you to enter:
+
+Email for signup
+
+Phone number for signup
+
+Chrome browser will open automatically and complete the signup process.
+
+Running Test Report Generation
+After automation, you can generate a PDF test report using:
+
+bash
+Copy code
+python py_test_signup_report.py
+This will:
+
+Run the signup automation with logging
+
+Generate a PDF file named test_report.pdf
+
+Include:
+
+Execution log
+
+Status (SUCCESS / FAILED)
+
+Screenshots (if any failure occurs)
+
+You will be prompted to enter:
+
+Email for the test
+
+Phone number for the test
 
