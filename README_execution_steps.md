@@ -147,13 +147,13 @@ def test_signup_flow():
     automate_signup()
 ```
 
-2. Run tests using pytest and generate an HTML report:
+2. Run tests using pytest and generate a PDF report:
 
 ```bash
-pytest test_signup.py --html=report.html --self-contained-html
+python py_test_signup_report.py
 ```
 
-3. Open the generated `report.html` in a browser to view detailed test results.
+3. Open the generated `test_report.pdf` in a browser to view detailed test results.
 
 ---
 
@@ -186,32 +186,6 @@ testuser_<timestamp>@example.com
 - Passwords used for testing: `Test@12345`  
 - Phone numbers for testing: `9800000000`  
 
----
-
-## Notes
-
-- Ensure your network allows access to the signup page.
-- Selenium WebDriver may open multiple tabs or pop-ups depending on the site behavior.
-- Screenshots of failures are automatically saved in the current directory:
-  - `signup_failed.png`
-  - `sql_injection_failure.png`
-  - `unexpected_error.png`
-- Adjust `WebDriverWait` timeout values if page loads slower than expected.
-- Virtual environments are recommended to avoid dependency conflicts.
-- Pytest HTML report provides a detailed summary of each test execution.
-
----
-
-## Screenshots
-
-Screenshots are taken automatically for failed test cases.  
-Example:
-
-```
-signup_failed.png
-sql_injection_failure.png
-unexpected_error.png
-```
 
 ---
 
