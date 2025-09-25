@@ -21,8 +21,8 @@ def log_step(message, status="INFO"):
     print(entry)
 
 def generate_pdf_report(email, success=True):
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"signup_report_{timestamp}.pdf"
+    # timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"test_report.pdf"
     
     doc = SimpleDocTemplate(filename, pagesize=LETTER)
     styles = getSampleStyleSheet()
@@ -43,7 +43,7 @@ def generate_pdf_report(email, success=True):
     meta_style = styles["Normal"]
     story.append(Paragraph(f"<b>Test Email:</b> {email}", meta_style))
     story.append(Paragraph(f"<b>Test Date:</b> {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", meta_style))
-    story.append(Paragraph(f"<b>Status:</b> {'✅ SUCCESS' if success else '❌ FAILED'}", meta_style))
+    story.append(Paragraph(f"<b>Status:</b> {'SUCCESS' if success else 'FAILED'}", meta_style))
     story.append(Spacer(1, 12))
 
     # Log entries
@@ -115,7 +115,7 @@ def run_signup_flow(user_email, user_phone):
             EC.element_to_be_clickable((By.XPATH, "/html/body/div[3]/div[4]/div/div/div/div[2]/div/form/div[2]/button"))
         )
         verify_btn.click()
-        log_step("✅ Verify Code button clicked successfully!")
+        log_step("Verify Code button clicked successfully!")
 
         # Fill agency info
         wait = WebDriverWait(driver, 10)
@@ -142,14 +142,14 @@ def run_signup_flow(user_email, user_phone):
         # Click Next
         next_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Next')]")))
         next_button.click()
-        log_step("✅ Successfully selected region and clicked Next.")
+        log_step("Successfully selected region and clicked Next.")
 
         # Select experience
         select_element = wait.until(
             EC.presence_of_element_located((By.XPATH, "//select[@aria-hidden='true']"))
         )
         Select(select_element).select_by_visible_text("2 years")
-        log_step("✅ Selected '2 years' experience.")
+        log_step("Selected '2 years' experience.")
 
         # Fill professional info
         wait.until(EC.presence_of_element_located((By.NAME, "number_of_students_recruited_annually"))).send_keys("50")
@@ -165,11 +165,11 @@ def run_signup_flow(user_email, user_phone):
 
         next_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Next')]")))
         next_button.click()
-        log_step("✅ Filled professional experience and clicked Next.")
+        log_step("Filled professional experience and clicked Next.")
 
         # Final form
         wait.until(EC.presence_of_element_located((By.NAME, "business_registration_number"))).send_keys("1234567890")
-        log_step("✅ Filled business registration number.")
+        log_step("Filled business registration number.")
 
         # Preferred country
         countries_dropdown = wait.until(
@@ -182,28 +182,28 @@ def run_signup_flow(user_email, user_phone):
             EC.element_to_be_clickable((By.XPATH, f"//*[@id='{countries_controls_id}']//span[normalize-space(text())='Australia']"))
         )
         countries_option.click()
-        log_step("✅ Selected 'Australia' as preferred country.")
+        log_step("Selected 'Australia' as preferred country.")
 
         # Institution types
         institution_checkboxes = driver.find_elements(By.XPATH, "//button[@role='checkbox']")
         if len(institution_checkboxes) >= 2:
             institution_checkboxes[0].click()
             institution_checkboxes[1].click()
-        log_step("✅ Selected Universities and Colleges.")
+        log_step("Selected Universities and Colleges.")
 
         # Certification
         wait.until(EC.presence_of_element_located((By.NAME, "certification_details"))).send_keys("ICEF Certified Education Agent")
-        log_step("✅ Filled certification details.")
+        log_step("Filled certification details.")
 
         time.sleep(30)  # Wait for manual OTP or auto-fill
 
         submit_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Submit')]")))
         submit_button.click()
-        log_step("✅ Submitted the form.")
+        log_step("Submitted the form.")
         success = True
 
     except Exception as e:
-        log_step(f"❌ Test failed with error: {str(e)}", "ERROR")
+        log_step(f"Test failed with error: {str(e)}", "ERROR")
         success = False
         # Optional: take screenshot
         if driver:
