@@ -60,7 +60,7 @@ def run_signup_flow(user_email, user_phone):
             EC.element_to_be_clickable((By.XPATH, "/html/body/div[3]/div[4]/div/div/div/div[2]/div/form/div[2]/button"))
         )
         verify_btn.click()
-        print("✅ Verify Code button clicked successfully!")
+        print("Verify Code button clicked successfully!")
         time.sleep(10)
 
         wait = WebDriverWait(driver, 10)
@@ -100,7 +100,7 @@ def run_signup_flow(user_email, user_phone):
             EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Next')]"))
         )
         next_button.click()
-        print("✅ Successfully selected first region and clicked Next.")
+        print("Successfully selected first region and clicked Next.")
         time.sleep(5)
 
         select_element = wait.until(
@@ -108,7 +108,7 @@ def run_signup_flow(user_email, user_phone):
         )
         select = Select(select_element)
         select.select_by_visible_text("2 years")
-        print("✅ Selected '2 years' as experience using hidden select.")
+        print("Selected '2 years' as experience using hidden select.")
         time.sleep(2)
 
         students_field = wait.until(EC.presence_of_element_located((By.NAME, "number_of_students_recruited_annually")))
@@ -129,12 +129,12 @@ def run_signup_flow(user_email, user_phone):
             EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Next')]"))
         )
         next_button.click()
-        print("✅ Filled professional experience form and clicked Next.")
+        print("Filled professional experience form and clicked Next.")
         time.sleep(5)
 
         reg_number = wait.until(EC.presence_of_element_located((By.NAME, "business_registration_number")))
         reg_number.send_keys("1234567890")
-        print("✅ Filled business registration number.")
+        print("Filled business registration number.")
 
         countries_dropdown = wait.until(
             EC.element_to_be_clickable((By.XPATH, "//label[contains(text(), 'Preferred Countries')]/following-sibling::button[@role='combobox']"))
@@ -152,25 +152,25 @@ def run_signup_flow(user_email, user_phone):
             )
         )
         countries_option.click()
-        print("✅ Selected 'Australia' as preferred country.")
+        print("Selected 'Australia' as preferred country.")
         time.sleep(1)
 
         institution_checkboxes = driver.find_elements(By.XPATH, "//div[contains(@class, 'flex gap-3 flex-wrap')]//button[@role='checkbox']")
         if len(institution_checkboxes) >= 2:
             institution_checkboxes[0].click()
             institution_checkboxes[1].click()
-            print("✅ Selected Universities and Colleges.")
+            print("Selected Universities and Colleges.")
 
         cert_field = wait.until(EC.presence_of_element_located((By.NAME, "certification_details")))
         cert_field.send_keys("ICEF Certified Education Agent")
-        print("✅ Filled certification details.")
+        print("Filled certification details.")
 
         time.sleep(30)
         submit_button = wait.until(
             EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Submit')]"))
         )
         submit_button.click()
-        print("✅ Submitted the form.")
+        print("Submitted the form.")
         time.sleep(5)
 
     finally:

@@ -4,11 +4,21 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select
 import time
+import requests
+import re
 
 
-# Ask user for email and phone number (instead of hardcoding)
-user_email = input("Enter email address for signup: ")
-user_phone = input("Enter phone number for signup: ")
+MAILSLURP_API_KEY = "ab50729eb3d79da9f9abc62f6ed04694d20704c4ab2298e97c57c95084ab0634"  # get from https://app.mailslurp.com
+
+# 1. Create a disposable inbox
+inbox = requests.post(
+    "https://api.mailslurp.com/inboxes",
+    headers={"x-api-key": MAILSLURP_API_KEY}
+).json()
+
+inbox_id = inbox["id"]
+email_address = inbox["emailAddress"]
+print(f"📧 Using disposable email: {email_address}")
 
 # Initialize the WebDriver (Make sure to have the appropriate driver installed)
 driver = webdriver.Chrome()
@@ -35,11 +45,11 @@ try:
     last_name.send_keys("Doe")
 
     email = driver.find_element(By.NAME, "email")
-    email.send_keys(user_email)
+    email.send_keys(email_address)
     time.sleep(2)
 
     phone_number = driver.find_element(By.NAME, "phoneNumber")
-    phone_number.send_keys(user_phone)
+    phone_number.send_keys("9810000051")
     time.sleep(5)
 
     pwd_field = driver.find_element(By.NAME, "password")
@@ -63,6 +73,40 @@ try:
     verify_btn = WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable((By.XPATH, "/html/body/div[3]/div[4]/div/div/div/div[2]/div/form/div[2]/button"))
     )
+
+    #Automate code retrieval from email
+    wait = WebDriverWait(driver, 120)  # Adjust timeout as needed
+    # --- WAIT FOR EMAIL AND GET OTP ---
+    print("⏳ Waiting for OTP email...")
+    otp_code = None
+    for _ in range(20):  # retry up to 20 times (20*5 = 100s max wait)
+        time.sleep(5)
+        messages = requests.get(
+            f"https://api.mailslurp.com/inboxes/{inbox_id}/emails",
+            headers={"x-api-key": MAILSLURP_API_KEY}
+        ).json()
+
+        if messages:
+            latest_email_id = messages[0]["id"]
+            email_content = requests.get(
+                f"https://api.mailslurp.com/emails/{latest_email_id}",
+                headers={"x-api-key": MAILSLURP_API_KEY}
+            ).json()
+            body = email_content["body"]
+            print("📧 Email received!")
+            # Extract 6-digit code using regex
+            match = re.search(r"\b\d{6}\b", body)
+            if match:
+                otp_code = match.group()
+                print(f"✅ OTP Extracted: {otp_code}")
+                break
+
+    if not otp_code:
+        raise Exception("❌ OTP not received within timeout!")
+
+    # --- ENTER OTP ---
+    otp_field = wait.until(EC.presence_of_element_located((By.NAME, "otp_code")))
+    otp_field.send_keys(otp_code)
 
     # Click the Verify Code button
     verify_btn.click()
