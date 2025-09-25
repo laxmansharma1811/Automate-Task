@@ -156,7 +156,7 @@ Chrome browser will open automatically and complete the signup process.
 Running Test Report Generation
 After automation, you can generate a PDF test report using:
 
-bash
+```bash
 Copy code
 python py_test_signup_report.py
 This will:
