@@ -6,7 +6,7 @@ from selenium.webdriver.support.ui import Select
 import time
 
 
-# Ask user for email and phone number (instead of hardcoding)
+# Ask user for email and phone number
 user_email = input("Enter email address for signup: ")
 user_phone = input("Enter phone number for signup: ")
 
@@ -66,11 +66,11 @@ try:
 
     # Click the Verify Code button
     verify_btn.click()
-    print("✅ Verify Code button clicked successfully!")
+    print("Verify Code button clicked successfully!")
     time.sleep(10)
 
     #Agency field
-    wait = WebDriverWait(driver, 10)  # Adjust timeout as needed
+    wait = WebDriverWait(driver, 10) 
 
     agency_name = wait.until(EC.presence_of_element_located((By.NAME, "agency_name")))
     agency_name.send_keys("Test Agency")
@@ -118,7 +118,7 @@ try:
     )
     next_button.click()
 
-    print("✅ Successfully selected first region and clicked Next.")
+    print("Successfully selected first region and clicked Next.")
 
     # Optional: Wait to observe result
     time.sleep(5)
@@ -131,7 +131,7 @@ try:
     # Use Select to choose the option by visible text
     select = Select(select_element)
     select.select_by_visible_text("2 years")
-    print("✅ Selected '2 years' as experience using hidden select.")
+    print("Selected '2 years' as experience using hidden select.")
     time.sleep(2)
     
     # Optional: Fill other fields if needed
@@ -158,7 +158,7 @@ try:
         EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Next')]"))
     )
     next_button.click()
-    print("✅ Filled professional experience form and clicked Next.")
+    print("Filled professional experience form and clicked Next.")
     
     time.sleep(5)  
 
@@ -166,7 +166,7 @@ try:
     # Fill Business Registration Number
     reg_number = wait.until(EC.presence_of_element_located((By.NAME, "business_registration_number")))
     reg_number.send_keys("1234567890")
-    print("✅ Filled business registration number.")
+    print("Filled business registration number.")
 
     # Preferred Countries dropdown
     countries_dropdown = wait.until(
@@ -185,7 +185,7 @@ try:
         EC.element_to_be_clickable((By.XPATH, f"//*[@id='{countries_controls_id}']//div[contains(@class, 'flex cursor-pointer')]//span[normalize-space(text())='Australia']"))
     )
     countries_option.click()
-    print("✅ Selected 'Australia' as preferred country.")
+    print("Selected 'Australia' as preferred country.")
     time.sleep(1)
 
     # Preferred Institution Types checkboxes
@@ -193,12 +193,12 @@ try:
     if len(institution_checkboxes) >= 2:
         institution_checkboxes[0].click()  # Universities
         institution_checkboxes[1].click()  # Colleges
-        print("✅ Selected Universities and Colleges.")
+        print("Selected Universities and Colleges.")
 
     # Certification Details
     cert_field = wait.until(EC.presence_of_element_located((By.NAME, "certification_details")))
     cert_field.send_keys("ICEF Certified Education Agent")
-    print("✅ Filled certification details.")
+    print("Filled certification details.")
 
     # Files Upload to hold time
     time.sleep(30)
@@ -209,9 +209,9 @@ try:
         EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Submit')]"))
     )
     submit_button.click()
-    print("✅ Submitted the form.")
+    print("Submitted the form.")
 
-    time.sleep(5)  # Wait to observe
+    time.sleep(5)  
 
 
 finally:
